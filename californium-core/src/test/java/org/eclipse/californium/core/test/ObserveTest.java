@@ -27,6 +27,7 @@ import static org.junit.Assert.assertTrue;
 
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.URI;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -98,9 +99,6 @@ public class ObserveTest {
 	private MyResource resourceY;
 	private ClientMessageInterceptor interceptor;
 
-	private boolean waitforit = true;
-
-	private int serverPort;
 	private String uriX;
 	private String uriY;
 
@@ -120,7 +118,8 @@ public class ObserveTest {
 	@Test
 	public void testObserveLifecycle() throws Exception {
 
-		interceptor = new ClientMessageInterceptor();
+		final CountDownLatch latch = new CountDownLatch(1);
+		interceptor = new ClientMessageInterceptor(latch);
 		EndpointManager.getEndpointManager().getDefaultEndpoint().addInterceptor(interceptor);
 
 		// setup observe relation to resource X and Y
@@ -157,9 +156,7 @@ public class ObserveTest {
 		// (which will go lost, see ClientMessageInterceptor)
 
 		// wait for the server to timeout, see ClientMessageInterceptor.
-		while (waitforit) {
-			Thread.sleep(1000);
-		}
+		assertTrue(latch.await(20,  TimeUnit.SECONDS));
 
 		Thread.sleep(500);
 
@@ -297,15 +294,20 @@ public class ObserveTest {
 		server.add(resourceY);
 		server.start();
 
-		serverPort = endpoint.getAddress().getPort();
-		uriX = String.format("coap://127.0.0.1:%d/%s", serverPort, TARGET_X);
-		uriY = String.format("coap://127.0.0.1:%d/%s", serverPort, TARGET_Y);
+		URI uri = endpoint.getUri();
+		uriX = uri.toString() + "/" + TARGET_X;
+		uriY = uri.toString() + "/" + TARGET_Y;
 	}
 
 	private class ClientMessageInterceptor implements MessageInterceptor {
 
+		private final CountDownLatch latch;
 		private int counter = 0; // counts the incoming responses
-
+		
+		public ClientMessageInterceptor(CountDownLatch latch) {
+			this.latch = latch;
+		}
+		
 		@Override
 		public void receiveResponse(Response response) {
 			counter++;
@@ -340,8 +342,7 @@ public class ObserveTest {
 				// the server now removes all observe relations from the
 				// endpoint 5683 which are request A to resource X and request B
 				// to resource Y.
-
-				waitforit = false;
+				latch.countDown();
 				break;
 			default:
 				throw new IllegalStateException("Should not receive " + counter + " responses");

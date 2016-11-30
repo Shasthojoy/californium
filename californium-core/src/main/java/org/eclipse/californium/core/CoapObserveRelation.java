@@ -112,10 +112,11 @@ public class CoapObserveRelation {
 	}
 
 	/** 
-	 * Send request with option "cancel observe" (GET with Observe=1). 
+	 * Prepare request with option "cancel observe" (GET with Observe=1). 
 	 */
-	private void sendCancelObserve() {
+	private Request prepareCancelObserve() {
 		Request cancel = Request.newGet();
+		cancel.setType(request.getType());
 		cancel.setDestination(request.getDestination());
 		cancel.setDestinationPort(request.getDestinationPort());
 		// use same Token
@@ -129,7 +130,7 @@ public class CoapObserveRelation {
 			cancel.addMessageObserver(mo);
 		}
 
-		endpoint.sendRequest(cancel);
+		return cancel;
 	}
 
 	/** 
@@ -146,10 +147,10 @@ public class CoapObserveRelation {
 	 * Cancel the observe relation by sending a GET with Observe=1.
 	 */
 	public void proactiveCancel() {
-		sendCancelObserve();
-
+		Request cancel = prepareCancelObserve();
 		// cancel old ongoing request
 		cancel();
+		endpoint.sendRequest(cancel);
 	}
 	
 	/**
