@@ -184,6 +184,14 @@ public class ClientSynchronousTest {
 		Assert.assertEquals(Type.ACK, resp.advanced().getType());
 		Assert.assertEquals(CONTENT_1, resp.getResponseText());
 	}
+
+	@Test
+	public void testPingPong() throws Exception {
+		String uri = "coap://localhost:"+serverPort+"/"+TARGET;
+		CoapClient client = new CoapClient(uri).useExecutor();
+		boolean pong = client.ping();
+		Assert.assertTrue(pong);
+	}
 	
 	private void createServer() {
 		CoapEndpoint endpoint = new CoapEndpoint(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0));
