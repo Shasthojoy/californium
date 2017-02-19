@@ -15,9 +15,12 @@
  ******************************************************************************/
 package org.eclipse.californium.scandium.dtls;
 
+
 public class SimpleRecordLayer implements RecordLayer {
+
 	private DTLSFlight sentFlight;
 	private Record sentRecord;
+	private RecordProcessingException processingError;
 
 	@Override
 	public void sendFlight(DTLSFlight flight) {
@@ -29,11 +32,20 @@ public class SimpleRecordLayer implements RecordLayer {
 		sentRecord = record;
 	}
 
+	@Override
+	public void onRecordProcessingError(RecordProcessingException error) {
+		this.processingError = error;
+	}
+
 	public DTLSFlight getSentFlight() {
 		return sentFlight;
 	}
 
 	public Record getSentRecord() {
 		return sentRecord;
+	}
+
+	public RecordProcessingException getProcessingException() {
+		return processingError;
 	}
 }

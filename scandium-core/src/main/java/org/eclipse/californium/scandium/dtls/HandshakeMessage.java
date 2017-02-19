@@ -26,7 +26,6 @@ import java.util.logging.Logger;
 import org.eclipse.californium.elements.util.DatagramReader;
 import org.eclipse.californium.elements.util.DatagramWriter;
 import org.eclipse.californium.scandium.dtls.AlertMessage.AlertDescription;
-import org.eclipse.californium.scandium.dtls.AlertMessage.AlertLevel;
 import org.eclipse.californium.scandium.dtls.cipher.CipherSuite.KeyExchangeAlgorithm;
 
 
@@ -179,7 +178,7 @@ public abstract class HandshakeMessage extends AbstractMessage {
 	}
 
 	public static HandshakeMessage fromByteArray(byte[] byteArray, KeyExchangeAlgorithm keyExchange,
-			boolean useRawPublicKey, InetSocketAddress peerAddress) throws HandshakeException {
+			boolean useRawPublicKey, InetSocketAddress peerAddress) throws RecordParsingException {
 		DatagramReader reader = new DatagramReader(byteArray);
 		HandshakeType type = HandshakeType.getTypeByCode(reader.read(MESSAGE_TYPE_BITS));
 		LOGGER.log(Level.FINEST, "Parsing HANDSHAKE message of type [{0}]", type);
@@ -245,9 +244,9 @@ public abstract class HandshakeMessage extends AbstractMessage {
 			break;
 
 		default:
-			throw new HandshakeException(
+			throw new RecordParsingException(ContentType.HANDSHAKE, peerAddress,
 					String.format("Cannot parse unsupported message type %s", type),
-					new AlertMessage(AlertLevel.FATAL, AlertDescription.ILLEGAL_PARAMETER, peerAddress));
+					AlertDescription.ILLEGAL_PARAMETER);
 		}
 		// keep the raw bytes for computation of handshake hash
 		body.rawMessage = Arrays.copyOf(byteArray, byteArray.length);
@@ -259,22 +258,21 @@ public abstract class HandshakeMessage extends AbstractMessage {
 	}
 
 	private static HandshakeMessage readServerKeyExchange(byte[] bytesLeft, KeyExchangeAlgorithm keyExchange, InetSocketAddress peerAddress)
-			throws HandshakeException {
+			throws RecordParsingException {
 		switch (keyExchange) {
 		case EC_DIFFIE_HELLMAN:
 			return ECDHServerKeyExchange.fromByteArray(bytesLeft, peerAddress);
 		case PSK:
 			return PSKServerKeyExchange.fromByteArray(bytesLeft, peerAddress);
 		default:
-			throw new HandshakeException(
-					"Unsupported key exchange algorithm",
-					new AlertMessage(AlertLevel.FATAL, AlertDescription.ILLEGAL_PARAMETER, peerAddress));
+			throw new RecordParsingException(ContentType.HANDSHAKE, peerAddress,
+					"Unsupported key exchange algorithm", AlertDescription.ILLEGAL_PARAMETER);
 		}
 
 	}
 
 	private static HandshakeMessage readClientKeyExchange(byte[] bytesLeft, KeyExchangeAlgorithm keyExchange, InetSocketAddress peerAddress)
-			throws HandshakeException {
+			throws RecordParsingException {
 		switch (keyExchange) {
 		case EC_DIFFIE_HELLMAN:
 			return ECDHClientKeyExchange.fromByteArray(bytesLeft, peerAddress);
@@ -283,9 +281,8 @@ public abstract class HandshakeMessage extends AbstractMessage {
 		case NULL:
 			return NULLClientKeyExchange.fromByteArray(bytesLeft, peerAddress);
 		default:
-			throw new HandshakeException(
-					"Unknown key exchange algorithm",
-					new AlertMessage(AlertLevel.FATAL, AlertDescription.ILLEGAL_PARAMETER, peerAddress));
+			throw new RecordParsingException(ContentType.HANDSHAKE, peerAddress,
+					"Unknown key exchange algorithm", AlertDescription.ILLEGAL_PARAMETER);
 		}
 	}
 

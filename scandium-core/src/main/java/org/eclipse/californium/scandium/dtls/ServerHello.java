@@ -24,7 +24,6 @@ import java.net.InetSocketAddress;
 import org.eclipse.californium.elements.util.DatagramReader;
 import org.eclipse.californium.elements.util.DatagramWriter;
 import org.eclipse.californium.scandium.dtls.AlertMessage.AlertDescription;
-import org.eclipse.californium.scandium.dtls.AlertMessage.AlertLevel;
 import org.eclipse.californium.scandium.dtls.CertificateTypeExtension.CertificateType;
 import org.eclipse.californium.scandium.dtls.HelloExtension.ExtensionType;
 import org.eclipse.californium.scandium.dtls.cipher.CipherSuite;
@@ -174,11 +173,11 @@ public final class ServerHello extends HandshakeMessage {
 	 * @param peerAddress the IP address and port of the peer this
 	 *           message has been received from or should be sent to
 	 * @return the object representation
-	 * @throws HandshakeException if the cipher suite code selected by the server is either
+	 * @throws RecordParsingException if the cipher suite code selected by the server is either
 	 *           unknown, i.e. not defined in {@link CipherSuite} at all, or
 	 *           {@link CipherSuite#TLS_NULL_WITH_NULL_NULL}
 	 */
-	public static HandshakeMessage fromByteArray(byte[] byteArray, InetSocketAddress peerAddress) throws HandshakeException {
+	public static HandshakeMessage fromByteArray(byte[] byteArray, InetSocketAddress peerAddress) throws RecordParsingException {
 		DatagramReader reader = new DatagramReader(byteArray);
 
 		int major = reader.read(VERSION_BITS);
@@ -193,12 +192,14 @@ public final class ServerHello extends HandshakeMessage {
 		int code = reader.read(CIPHER_SUITE_BITS);
 		CipherSuite cipherSuite = CipherSuite.getTypeByCode(code);
 		if (cipherSuite == null) {
-			throw new HandshakeException(
+			throw new RecordParsingException(
+					ContentType.HANDSHAKE, peerAddress,
 					String.format("Server selected unknown cipher suite [%s]", Integer.toHexString(code)),
-					new AlertMessage(AlertLevel.FATAL, AlertDescription.HANDSHAKE_FAILURE, peerAddress));
-		} else if ( cipherSuite == CipherSuite.TLS_NULL_WITH_NULL_NULL) {
-			throw new HandshakeException("Server tries to negotiate NULL cipher suite",
-					new AlertMessage(AlertLevel.FATAL, AlertDescription.HANDSHAKE_FAILURE, peerAddress));
+					AlertDescription.ILLEGAL_PARAMETER);
+		} else if (cipherSuite == CipherSuite.TLS_NULL_WITH_NULL_NULL) {
+			throw new RecordParsingException(
+					ContentType.HANDSHAKE, peerAddress, "Server tries to negotiate NULL cipher suite",
+					AlertDescription.ILLEGAL_PARAMETER);
 		}
 		CompressionMethod compressionMethod = CompressionMethod.getMethodByCode(reader.read(COMPRESSION_METHOD_BITS));
 

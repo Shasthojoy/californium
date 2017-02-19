@@ -47,7 +47,7 @@ public class HelloExtensionsTest {
 	}
 
 	@Test
-	public void testSerializationDeserialization() throws HandshakeException {
+	public void testSerializationDeserialization() throws RecordParsingException {
 		ClientCertificateTypeExtension ext = new ClientCertificateTypeExtension(true);
 		ext.addCertificateType(CertificateType.X_509);
 		ext.addCertificateType(CertificateType.RAW_PUBLIC_KEY);
@@ -64,7 +64,7 @@ public class HelloExtensionsTest {
 	}
 
 	@Test
-	public void testFromByteArrayIgnoresUnknownExtensionTypes() throws HandshakeException {
+	public void testFromByteArrayIgnoresUnknownExtensionTypes() throws RecordParsingException {
 		givenAMixOfSupportedAndUnsupportedHelloExtensions();
 		whenDeserializingFromByteArray();
 		assertThatSupportedExtensionTypesHaveBeenDeserialized();
@@ -122,7 +122,7 @@ public class HelloExtensionsTest {
 		helloExtensionBytes = helloExtensions.toByteArray();
 	}
 
-	private void whenDeserializingFromByteArray() throws HandshakeException {
+	private void whenDeserializingFromByteArray() throws RecordParsingException {
 		helloExtensions = HelloExtensions.fromByteArray(helloExtensionBytes, peerAddress);
 	}
 

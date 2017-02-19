@@ -28,6 +28,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
+import java.util.concurrent.Executors;
 
 import org.eclipse.californium.scandium.category.Small;
 import org.eclipse.californium.scandium.config.DtlsConnectorConfig;
@@ -159,7 +160,8 @@ public class ClientHandshakerTest {
 				recordLayer,
 				null,
 				builder.build(),
-				MAX_TRANSMISSION_UNIT);
+				MAX_TRANSMISSION_UNIT,
+				Executors.newSingleThreadExecutor());
 	}
 
 	private static void assertPreferredServerCertificateExtension(final ClientHello msg, final CertificateType expectedType) {
@@ -169,7 +171,7 @@ public class ClientHandshakerTest {
 			is(expectedType));
 	}
 
-	private static ClientHello getClientHello(final DTLSFlight flight) throws GeneralSecurityException, HandshakeException {
+	private static ClientHello getClientHello(final DTLSFlight flight) throws RecordParsingException {
 		Record record = flight.getMessages().get(0);
 		return (ClientHello) record.getFragment();
 	}

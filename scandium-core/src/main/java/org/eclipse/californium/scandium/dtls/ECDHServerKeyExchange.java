@@ -159,20 +159,20 @@ public final class ECDHServerKeyExchange extends ServerKeyExchange {
 	 *            the signature (encoded)
 	 * @param peerAddress the IP address and port of the peer this
 	 *            message has been received from or should be sent to
-	 * @throws HandshakeException if the server's public key could not be re-constructed
+	 * @throws RecordParsingException if the server's public key could not be re-constructed
 	 *            from the parameters contained in the message
 	 */
 	private ECDHServerKeyExchange(SignatureAndHashAlgorithm signatureAndHashAlgorithm, int curveId, byte[] pointEncoded,
-			byte[] signatureEncoded, InetSocketAddress peerAddress) throws HandshakeException {
+			byte[] signatureEncoded, InetSocketAddress peerAddress) throws RecordParsingException {
 		this(signatureAndHashAlgorithm, curveId, peerAddress);
 		this.pointEncoded = Arrays.copyOf(pointEncoded, pointEncoded.length);
 		this.signatureEncoded = Arrays.copyOf(signatureEncoded, signatureEncoded.length);
 		// re-create public key from params
 		SupportedGroup group = SupportedGroup.fromId(curveId);
 		if (group == null || !group.isUsable()) {
-			throw new HandshakeException(
+			throw new RecordParsingException(ContentType.HANDSHAKE, peerAddress,
 				String.format("Server used unsupported elliptic curve (%d) for ECDH", curveId),
-				new AlertMessage(AlertLevel.FATAL, AlertDescription.HANDSHAKE_FAILURE, peerAddress));
+				AlertDescription.ILLEGAL_PARAMETER);
 		} else {
 			try {
 				point = ECDHECryptography.decodePoint(pointEncoded, group.getEcParams().getCurve());
@@ -181,9 +181,9 @@ public final class ECDHServerKeyExchange extends ServerKeyExchange {
 				publicKey = (ECPublicKey) keyFactory.generatePublic(new ECPublicKeySpec(point, group.getEcParams()));
 			} catch (GeneralSecurityException e) {
 				LOGGER.log(Level.FINE, "Cannot re-create server's public key from params", e);
-				throw new HandshakeException(
+				throw new RecordParsingException(ContentType.HANDSHAKE, peerAddress,
 					String.format("Cannot re-create server's public key from params: %s", e.getMessage()),
-					new AlertMessage(AlertLevel.FATAL, AlertDescription.INTERNAL_ERROR, peerAddress));
+					AlertDescription.INTERNAL_ERROR);
 			}
 		}
 	}
@@ -238,7 +238,7 @@ public final class ECDHServerKeyExchange extends ServerKeyExchange {
 		}
 	}
 
-	public static HandshakeMessage fromByteArray(byte[] byteArray, InetSocketAddress peerAddress) throws HandshakeException {
+	public static HandshakeMessage fromByteArray(byte[] byteArray, InetSocketAddress peerAddress) throws RecordParsingException {
 		DatagramReader reader = new DatagramReader(byteArray);
 		int curveType = reader.read(CURVE_TYPE_BITS);
 		switch (curveType) {
@@ -246,15 +246,15 @@ public final class ECDHServerKeyExchange extends ServerKeyExchange {
 		case NAMED_CURVE:
 			return readNamedCurve(reader, peerAddress);
 		default:
-			throw new HandshakeException(
+			throw new RecordParsingException(ContentType.HANDSHAKE, peerAddress,
 					String.format(
 							"Curve type [%s] received in ServerKeyExchange message from peer [%s] is unsupported",
 							curveType, peerAddress),
-					new AlertMessage(AlertLevel.FATAL, AlertDescription.HANDSHAKE_FAILURE, peerAddress));
+					AlertDescription.ILLEGAL_PARAMETER);
 		}
 	}
 
-	private static ECDHServerKeyExchange readNamedCurve(final DatagramReader reader, final InetSocketAddress peerAddress) throws HandshakeException {
+	private static ECDHServerKeyExchange readNamedCurve(final DatagramReader reader, final InetSocketAddress peerAddress) throws RecordParsingException {
 		int curveId = reader.read(NAMED_CURVE_BITS);
 		int length = reader.read(PUBLIC_LENGTH_BITS);
 		byte[] pointEncoded = reader.readBytes(length);

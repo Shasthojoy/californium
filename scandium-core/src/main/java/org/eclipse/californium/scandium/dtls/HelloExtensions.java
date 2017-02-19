@@ -30,8 +30,6 @@ import java.util.logging.Logger;
 
 import org.eclipse.californium.elements.util.DatagramReader;
 import org.eclipse.californium.elements.util.DatagramWriter;
-import org.eclipse.californium.scandium.dtls.AlertMessage.AlertDescription;
-import org.eclipse.californium.scandium.dtls.AlertMessage.AlertLevel;
 import org.eclipse.californium.scandium.dtls.HelloExtension.ExtensionType;
 
 
@@ -118,7 +116,7 @@ public final class HelloExtensions {
 		}
 	}
 
-	public static HelloExtensions fromByteArray(byte[] byteArray, InetSocketAddress peerAddress) throws HandshakeException {
+	public static HelloExtensions fromByteArray(byte[] byteArray, InetSocketAddress peerAddress) throws RecordParsingException {
 		DatagramReader reader = new DatagramReader(byteArray);
 		List<HelloExtension> extensions = new ArrayList<HelloExtension>();
 
@@ -148,9 +146,8 @@ public final class HelloExtensions {
 		if (length < 0) {
 			// the lengths of the extensions did not add up correctly
 			// this is always FATAL as defined by the TLS spec (section 7.2.2)
-			throw new HandshakeException(
-					"Hello message contained malformed extensions",
-					new AlertMessage(AlertLevel.FATAL, AlertDescription.DECODE_ERROR, peerAddress));
+			throw new RecordParsingException(ContentType.HANDSHAKE, peerAddress,
+					"Hello message contained malformed extensions");
 		} else {
 			return new HelloExtensions(extensions);
 		}

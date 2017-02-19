@@ -40,6 +40,7 @@ import java.security.cert.CertPath;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.Executor;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -143,15 +144,17 @@ public class ServerHandshaker extends Handshaker {
 	 *            the DTLS configuration.
 	 * @param maxTransmissionUnit
 	 *            the MTU value reported by the network interface the record layer is bound to.
+	 * @param taskExecutor
+	 *            The executor to use for processing handshake messages.
 	 * @throws HandshakeException if the handshaker cannot be initialized
 	 * @throws NullPointerException
-	 *            if session or recordLayer is <code>null</code>.
+	 *            if session, record layer or task executor is <code>null</code>.
 	 */
-	public ServerHandshaker(DTLSSession session, RecordLayer recordLayer, SessionListener sessionListener,
-			DtlsConnectorConfig config, int maxTransmissionUnit) throws HandshakeException {
-		this(0, session, recordLayer, sessionListener, config, maxTransmissionUnit);
+	ServerHandshaker(DTLSSession session, RecordLayer recordLayer, SessionListener sessionListener,
+			DtlsConnectorConfig config, int maxTransmissionUnit, Executor taskExecutor) throws HandshakeException {
+		this(0, session, recordLayer, sessionListener, config, maxTransmissionUnit, taskExecutor);
 	}
-	
+
 	/**
 	 * Creates a handshaker for negotiating a DTLS session with a client
 	 * following the full DTLS handshake protocol. 
@@ -171,16 +174,18 @@ public class ServerHandshaker extends Handshaker {
 	 *            the DTLS configuration.
 	 * @param maxTransmissionUnit
 	 *            the MTU value reported by the network interface the record layer is bound to.
+	 * @param taskExecutor
+	 *            The executor to use for processing handshake messages.
 	 * @throws IllegalStateException
 	 *            if the message digest required for computing the FINISHED message hash cannot be instantiated.
 	 * @throws IllegalArgumentException
 	 *            if the <code>initialMessageSequenceNo</code> is negative.
 	 * @throws NullPointerException
-	 *            if session, recordLayer or config is <code>null</code>.
+	 *            if session, record layer, config or task executor is <code>null</code>.
 	 */
-	public ServerHandshaker(int initialMessageSequenceNo, DTLSSession session, RecordLayer recordLayer, SessionListener sessionListener,
-			DtlsConnectorConfig config, int maxTransmissionUnit) { 
-		super(false, initialMessageSequenceNo, session, recordLayer, sessionListener, config.getTrustStore(), maxTransmissionUnit);
+	ServerHandshaker(int initialMessageSequenceNo, DTLSSession session, RecordLayer recordLayer, SessionListener sessionListener,
+			DtlsConnectorConfig config, int maxTransmissionUnit, Executor taskExecutor) { 
+		super(false, initialMessageSequenceNo, session, recordLayer, sessionListener, config.getTrustStore(), maxTransmissionUnit, taskExecutor);
 
 		this.supportedCipherSuites = Arrays.asList(config.getSupportedCipherSuites());
 
@@ -216,7 +221,8 @@ public class ServerHandshaker extends Handshaker {
 
 
 	@Override
-	protected synchronized void doProcessMessage(DTLSMessage message) throws HandshakeException, GeneralSecurityException {
+	protected synchronized void doProcessMessage(DTLSMessage message) throws RecordProcessingException {
+
 		if (lastFlight != null) {
 			// we already sent the last flight (including our FINISHED message),
 			// but the client does not seem to have received it because we received
@@ -906,14 +912,4 @@ public class ServerHandshaker extends Handshaker {
 			return false;
 		}
 	}
-
-//	@Override
-//	protected boolean isChangeCipherSpecMessageDue() {
-//
-//		boolean result = clientKeyExchange != null;
-//		if (clientAuthenticationRequired && getKeyExchangeAlgorithm() == KeyExchangeAlgorithm.EC_DIFFIE_HELLMAN) {
-//			result = result && certificateVerify != null;
-//		}
-//		return result;
-//	}
 }

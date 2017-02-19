@@ -64,7 +64,7 @@ public class ServerNameExtensionTest {
 	 * @throws HandshakeException if deserializaiton fails.
 	 */
 	@Test
-	public void testFromByteArrayCreatesEmptyExtension() throws HandshakeException {
+	public void testFromByteArrayCreatesEmptyExtension() throws RecordParsingException {
 
 		// GIVEN an empty extension structure
 		givenAnEmptyServerNameExtensionStruct();
@@ -82,7 +82,7 @@ public class ServerNameExtensionTest {
 	 * @throws HandshakeException if the extension cannot be parsed.
 	 */
 	@Test
-	public void testToByteArrayResultCanBeParsedIntoExtensionAgain() throws HandshakeException {
+	public void testToByteArrayResultCanBeParsedIntoExtensionAgain() throws RecordParsingException {
 
 		// GIVEN a serialized server name extension object
 		ServerNameExtension ext = ServerNameExtension.forHostName("iot.eclipse.org");
@@ -107,7 +107,7 @@ public class ServerNameExtensionTest {
 	 * @throws HandshakeException if the parsing fails.
 	 */
 	@Test
-	public void testFromByteArrayReadsHostName() throws HandshakeException {
+	public void testFromByteArrayReadsHostName() throws RecordParsingException {
 
 		// GIVEN a server name extension data struct with host name
 		givenAServerNameExtensionStruct((byte) 0x00, iotEclipseOrg);
@@ -129,8 +129,8 @@ public class ServerNameExtensionTest {
 
 		try {
 			whenParsingTheExtensionStruct();
-			fail("Should have thrown HandshakeException");
-		} catch (HandshakeException e) {
+			fail("Should have thrown RecordParsingException");
+		} catch (RecordParsingException e) {
 			// then a HandshakeException should indicate illegal code
 			assertThat(e.getAlert().getDescription(), is(AlertMessage.AlertDescription.ILLEGAL_PARAMETER));
 			assertThat(e.getAlert().getLevel(), is(AlertMessage.AlertLevel.FATAL));
@@ -170,7 +170,7 @@ public class ServerNameExtensionTest {
 		b.get(serverNameStructure);
 	}
 
-	private void whenParsingTheExtensionStruct() throws HandshakeException {
+	private void whenParsingTheExtensionStruct() throws RecordParsingException {
 		HelloExtensions helloExtensions = HelloExtensions.fromByteArray(serverNameStructure, new InetSocketAddress(0));
 		extension = (ServerNameExtension) helloExtensions.getExtension(ExtensionType.SERVER_NAME);
 	}

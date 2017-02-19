@@ -25,9 +25,9 @@
  ******************************************************************************/
 package org.eclipse.californium.scandium.dtls;
 
-import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
+import java.util.concurrent.Executor;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -55,15 +55,15 @@ public class ResumingServerHandshaker extends ServerHandshaker {
 
 	// Constructor ////////////////////////////////////////////////////
 
-	public ResumingServerHandshaker(int sequenceNumber, DTLSSession session, RecordLayer recordLayer, SessionListener sessionListener,
-			DtlsConnectorConfig config, int maxTransmissionUnit) {
-		super(sequenceNumber, session, recordLayer, sessionListener, config, maxTransmissionUnit);
+	ResumingServerHandshaker(int sequenceNumber, DTLSSession session, RecordLayer recordLayer, SessionListener sessionListener,
+			DtlsConnectorConfig config, int maxTransmissionUnit, Executor taskExecutor) {
+		super(sequenceNumber, session, recordLayer, sessionListener, config, maxTransmissionUnit, taskExecutor);
 	}
 
 	// Methods ////////////////////////////////////////////////////////
 
 	@Override
-	protected synchronized void doProcessMessage(DTLSMessage message) throws HandshakeException, GeneralSecurityException {
+	protected synchronized void doProcessMessage(DTLSMessage message) throws RecordProcessingException {
 
 		// log record now (even if message is still encrypted) in case an Exception
 		// is thrown during processing
@@ -199,11 +199,4 @@ public class ResumingServerHandshaker extends ServerHandshaker {
 		sessionEstablished();
 		handshakeCompleted();
 	}
-
-//	@Override
-//	protected boolean isChangeCipherSpecMessageDue() {
-//
-//		// in an abbreviated handshake we immediately expect the client's ChangeCipherSpec message
-//		return true;
-//	}
 }

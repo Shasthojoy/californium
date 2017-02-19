@@ -23,7 +23,6 @@ import java.net.InetSocketAddress;
 import org.eclipse.californium.elements.util.DatagramReader;
 import org.eclipse.californium.elements.util.DatagramWriter;
 import org.eclipse.californium.scandium.dtls.AlertMessage.AlertDescription;
-import org.eclipse.californium.scandium.dtls.AlertMessage.AlertLevel;
 
 /**
  * The change cipher spec protocol exists to signal transitions in ciphering
@@ -97,15 +96,15 @@ public final class ChangeCipherSpecMessage extends AbstractMessage {
 		return writer.toByteArray();
 	}
 
-	public static DTLSMessage fromByteArray(byte[] byteArray, InetSocketAddress peerAddress) throws HandshakeException {
+	public static DTLSMessage fromByteArray(byte[] byteArray, InetSocketAddress peerAddress) throws RecordParsingException {
 		DatagramReader reader = new DatagramReader(byteArray);
 		int code = reader.read(CCS_BITS);
 		if (code == CCSType.CHANGE_CIPHER_SPEC.getCode()) {
 			return new ChangeCipherSpecMessage(peerAddress);
 		} else {
-			String message = "Unknown Change Cipher Spec code received: " + code;
-			AlertMessage alert = new AlertMessage(AlertLevel.FATAL, AlertDescription.HANDSHAKE_FAILURE, peerAddress);
-			throw new HandshakeException(message, alert);
+			throw new RecordParsingException(ContentType.CHANGE_CIPHER_SPEC, peerAddress,
+					String.format("Unknown Change Cipher Spec code received: %d", code),
+					AlertDescription.ILLEGAL_PARAMETER);
 		}
 	}
 

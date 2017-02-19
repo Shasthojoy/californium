@@ -90,7 +90,7 @@ public class CertificateMessageTest {
 	}
 
 	@Test
-	public void testFromByteArrayHandlesEmptyMessageCorrectly() throws HandshakeException {
+	public void testFromByteArrayHandlesEmptyMessageCorrectly() throws RecordParsingException {
 		serializedMessage = new byte[]{0x00, 0x00, 0x00}; // length = 0 (empty message)
 		// parse expecting X.509 payload
 		message = CertificateMessage.fromByteArray(serializedMessage, false, peerAddress);
@@ -133,7 +133,7 @@ public class CertificateMessageTest {
 	}
 
 	@Test
-	public void testSerializationUsingRawPublicKey() throws IOException, GeneralSecurityException, HandshakeException {
+	public void testSerializationUsingRawPublicKey() throws IOException, GeneralSecurityException, RecordParsingException {
 		givenACertificateMessage(DtlsTestTools.getServerCertificateChain(), true);
 		PublicKey pk = message.getPublicKey();
 		assertNotNull(pk);
@@ -144,7 +144,7 @@ public class CertificateMessageTest {
 	}
 
 	@Test
-	public void testSerializationUsingX509() throws IOException, GeneralSecurityException, HandshakeException {
+	public void testSerializationUsingX509() throws IOException, GeneralSecurityException, RecordParsingException {
 		givenACertificateMessage(DtlsTestTools.getServerCertificateChain(), false);
 		PublicKey pk = message.getPublicKey();
 		assertNotNull(pk);

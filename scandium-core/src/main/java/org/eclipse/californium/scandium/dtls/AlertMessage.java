@@ -202,20 +202,20 @@ public final class AlertMessage extends AbstractMessage {
 		return writer.toByteArray();
 	}
 
-	public static AlertMessage fromByteArray(final byte[] byteArray, final InetSocketAddress peerAddress) throws HandshakeException {
+	public static AlertMessage fromByteArray(final byte[] byteArray, final InetSocketAddress peerAddress) throws RecordParsingException {
 		DatagramReader reader = new DatagramReader(byteArray);
 		byte levelCode = reader.readNextByte();
 		byte descCode = reader.readNextByte();
 		AlertLevel level = AlertLevel.getLevelByCode(levelCode);
 		AlertDescription description = AlertDescription.getDescriptionByCode(descCode);
 		if (level == null) {
-			throw new HandshakeException(
+			throw new RecordParsingException(ContentType.HANDSHAKE, peerAddress,
 					String.format("Unknown alert level code [%d]", levelCode),
-					new AlertMessage(AlertLevel.FATAL, AlertDescription.DECODE_ERROR, peerAddress));
+					AlertDescription.ILLEGAL_PARAMETER);
 		} else if (description == null) {
-			throw new HandshakeException(
+			throw new RecordParsingException(ContentType.HANDSHAKE, peerAddress,
 					String.format("Unknown alert description code [%d]", descCode),
-					new AlertMessage(AlertLevel.FATAL, AlertDescription.DECODE_ERROR, peerAddress));
+					AlertDescription.ILLEGAL_PARAMETER);
 		} else {
 			return new AlertMessage(level, description, peerAddress);
 		}

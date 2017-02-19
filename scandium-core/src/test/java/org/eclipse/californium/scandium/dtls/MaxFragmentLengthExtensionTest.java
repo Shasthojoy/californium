@@ -37,7 +37,7 @@ public class MaxFragmentLengthExtensionTest {
 	MaxFragmentLengthExtension extension;
 
 	@Test
-	public void testFromByteArray() throws HandshakeException {
+	public void testFromByteArray() throws RecordParsingException {
 		// given a max fragment length extension data struct with code 1
 		byte code = (byte) 0x01;
 		givenAMaxFragmentLengthStruct(code);
@@ -56,8 +56,8 @@ public class MaxFragmentLengthExtensionTest {
 
 		try {
 			whenParsingTheExtensionStruct();
-			fail("Should have thrown HandshakeException");
-		} catch (HandshakeException e) {
+			fail("Should have thrown RecordParsingException");
+		} catch (RecordParsingException e) {
 			// then a HandshakeException should indicate illegal code
 			assertThat(e.getAlert().getDescription(), is(AlertMessage.AlertDescription.ILLEGAL_PARAMETER));
 			assertThat(e.getAlert().getLevel(), is(AlertMessage.AlertLevel.FATAL));
@@ -89,7 +89,7 @@ public class MaxFragmentLengthExtensionTest {
 				code}; // code 
 	}
 
-	private void whenParsingTheExtensionStruct() throws HandshakeException {
+	private void whenParsingTheExtensionStruct() throws RecordParsingException {
 		HelloExtensions helloExtions = HelloExtensions.fromByteArray(maxFragmentLengthStructure, new InetSocketAddress(0));
 		extension = (MaxFragmentLengthExtension) 
 				helloExtions.getExtension(ExtensionType.MAX_FRAGMENT_LENGTH);

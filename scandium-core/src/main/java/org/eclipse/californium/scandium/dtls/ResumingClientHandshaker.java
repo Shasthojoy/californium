@@ -25,9 +25,9 @@
 ******************************************************************************/
 package org.eclipse.californium.scandium.dtls;
 
-import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
+import java.util.concurrent.Executor;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -71,16 +71,18 @@ public class ResumingClientHandshaker extends ClientHandshaker {
 	 *            the DTLS configuration parameters to use for the handshake.
 	 * @param maxTransmissionUnit
 	 *            the MTU value reported by the network interface the record layer is bound to.
+	 * @param taskExecutor
+	 *            The executor to use for processing handshake messages.
 	 * @throws IllegalArgumentException
 	 *            if the given session does not contain an identifier.
 	 * @throws IllegalStateException
 	 *            if the message digest required for computing the FINISHED message hash cannot be instantiated.
 	 * @throws NullPointerException
-	 *            if session, recordLayer or config is <code>null</code>
+	 *            if session, record layer, config or task executor is <code>null</code>
 	 */
-	public ResumingClientHandshaker(DTLSSession session, RecordLayer recordLayer, SessionListener sessionListener,
-			DtlsConnectorConfig config, int maxTransmissionUnit) {
-		super(session, recordLayer, sessionListener, config, maxTransmissionUnit);
+	ResumingClientHandshaker(DTLSSession session, RecordLayer recordLayer, SessionListener sessionListener,
+			DtlsConnectorConfig config, int maxTransmissionUnit, Executor taskExecutor) {
+		super(session, recordLayer, sessionListener, config, maxTransmissionUnit, taskExecutor);
 		if (session.getSessionIdentifier() == null) {
 			throw new IllegalArgumentException("Session must contain the ID of the session to resume");
 		}
@@ -90,7 +92,7 @@ public class ResumingClientHandshaker extends ClientHandshaker {
 	// Methods ////////////////////////////////////////////////////////
 
 	@Override
-	protected synchronized void doProcessMessage(DTLSMessage message) throws HandshakeException, GeneralSecurityException {
+	protected synchronized void doProcessMessage(DTLSMessage message) throws RecordProcessingException {
 		if (fullHandshake){
 			// handshake resumption was refused by the server
 			// we do a full handshake
@@ -278,11 +280,4 @@ public class ResumingClientHandshaker extends ClientHandshaker {
 
 		recordLayer.sendFlight(flight);
 	}
-
-//	@Override
-//	protected boolean isChangeCipherSpecMessageDue() {
-//
-//		// in an abbreviated handshake we immediately expect the server's ChangeCipherSpec message
-//		return true;
-//	}
 }

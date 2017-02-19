@@ -38,16 +38,20 @@ import java.security.cert.Certificate;
 import java.util.Date;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import org.eclipse.californium.elements.util.DatagramWriter;
 import org.eclipse.californium.scandium.category.Medium;
 import org.eclipse.californium.scandium.config.DtlsConnectorConfig;
+import org.eclipse.californium.scandium.dtls.AlertMessage.AlertLevel;
 import org.eclipse.californium.scandium.dtls.CertificateTypeExtension.CertificateType;
 import org.eclipse.californium.scandium.dtls.cipher.CipherSuite;
 import org.eclipse.californium.scandium.dtls.cipher.ECDHECryptography.SupportedGroup;
 import org.eclipse.californium.scandium.dtls.pskstore.StaticPskStore;
 import org.eclipse.californium.scandium.util.ServerNames;
 import org.eclipse.californium.scandium.util.ServerName.NameType;
+import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -62,6 +66,7 @@ public class ServerHandshakerTest {
 	static PrivateKey privateKey;
 	static Certificate[] certificateChain;
 	static Certificate[] trustedCertificates;
+	static ExecutorService taskExecutor;
 
 	DtlsConnectorConfig config;
 	ServerHandshaker handshaker;
@@ -72,12 +77,14 @@ public class ServerHandshakerTest {
 	byte[] random;
 	byte[] clientHelloMsg;
 	SimpleRecordLayer recordLayer;
+	LatchBasedMessageProcessingResultHandler messageProcessingResultHandler;
 
 	@BeforeClass
 	public static void loadKeys() throws IOException, GeneralSecurityException {
 		privateKey = DtlsTestTools.getPrivateKey();
 		certificateChain = DtlsTestTools.getServerCertificateChain();
 		trustedCertificates = DtlsTestTools.getTrustedCertificates();
+		taskExecutor = Executors.newSingleThreadExecutor();
 	}
 
 	@Before
@@ -109,13 +116,18 @@ public class ServerHandshakerTest {
 				(byte) 0xC0, (byte) 0x23};// TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256
 	}
 
+	@AfterClass
+	public static void shutdownExecutor() {
+		taskExecutor.shutdownNow();
+	}
+
 	@Test
 	public void testConstructorAdjustsMaxFragmentSize() throws HandshakeException {
 		// given a network interface with standard ethernet MTU (1500 bytes)
 		int networkMtu = ETHERNET_MTU;
 
 		// when instantiating a ServerHandshaker to negotiate a new session
-		handshaker = new ServerHandshaker(session, recordLayer, null, config, networkMtu);
+		handshaker = new ServerHandshaker(session, recordLayer, null, config, networkMtu, taskExecutor);
 
 		// then a fragment created under the session's current write state should
 		// fit into a single unfragmented UDP datagram
@@ -136,6 +148,7 @@ public class ServerHandshakerTest {
 		// not contain more than 512 bytes and the SERVER_HELLO message sent
 		// to the client contains a MaxFragmentLength extension indicating a length
 		// of 512 bytes
+		assertNotNull(messageProcessingResultHandler.getLastMessage(200));
 		assertTrue(session.getMaxFragmentLength() <= 512);
 		assertThat(recordLayer.getSentFlight(), is(notNullValue()));
 		Record record = recordLayer.getSentFlight().getMessages().get(0);
@@ -162,19 +175,26 @@ public class ServerHandshakerTest {
 
 		// THEN the server names conveyed in the CLIENT_HELLO message
 		// are stored in the handshaker
+		assertNotNull(messageProcessingResultHandler.getLastMessage(200));
 		ServerNames serverNames = handshaker.getIndicatedServerNames();
 		assertNotNull(serverNames);
 		assertThat(new String(serverNames.get(NameType.HOST_NAME)), is("iot.eclipse.org"));
 	}
 
 	@Test
-	public void testReceiveClientHelloIncludesUnknownCiphersInHandshakeHashGeneration() throws HandshakeException {
+	public void testReceiveClientHelloIncludesUnknownCurvesInHandshakeHashGeneration() throws HandshakeException {
 
+		// GIVEN a client supporting elliptic curves unknown to the server
 		List<byte[]> extensions = new LinkedList<>();
-		extensions.add(DtlsTestTools.newSupportedEllipticCurvesExtension(getArbitrarySupportedGroup().getId()));
+		extensions.add(DtlsTestTools.newSupportedEllipticCurvesExtension(258)); // curve ffdhe4096
 
+		// WHEN the client sends its CLIENT_HELLO message
 		processClientHello(0, extensions);
 
+		// THEN the server aborts the handshake and the unsupported curve's code is included in
+		// the server's message digest created for the handshake messages
+
+		assertNotNull(messageProcessingResultHandler.getLastError(200)); // server will abort handshake
 		byte[] loggedMsg = new byte[clientHelloMsg.length];
 		// copy the received ClientHello message from the handshakeMessages buffer
 		System.arraycopy(handshaker.handshakeMessages, 0, loggedMsg, 0, clientHelloMsg.length);
@@ -186,17 +206,17 @@ public class ServerHandshakerTest {
 	@Test
 	public void testReceiveClientHelloDoesNotNegotiateNullCipher() throws HandshakeException {
 
+		// GIVEN a client that wants to use the NULL cipher suite
 		supportedClientCiphers = new byte[]{(byte) 0x00, (byte) 0x00}; // TLS_NULL_WITH_NULL_NULL
 
-		try {
-			// process Client Hello including Cookie
-			processClientHello(0, null);
-			fail("Server should have aborted cipher negotiation");
-		} catch (HandshakeException e) {
-			// server has aborted handshake as required
-			assertEquals(AlertMessage.AlertLevel.FATAL, e.getAlert().getLevel());
-			assertThat(session.getCipherSuite(), is(CipherSuite.TLS_NULL_WITH_NULL_NULL));
-		}
+		// WHEN the client sends its CLIENT_HELLO message
+		processClientHello(0, null);
+
+		// THEN the server aborts the handshake
+		RecordProcessingException error = messageProcessingResultHandler.getLastError(200);
+		assertNotNull(error);
+		assertThat(error.getSeverity(), is(AlertMessage.AlertLevel.FATAL));
+		assertThat(session.getCipherSuite(), is(CipherSuite.TLS_NULL_WITH_NULL_NULL));
 	}
 
 	/**
@@ -223,7 +243,7 @@ public class ServerHandshakerTest {
 		// but offering both a public key based as well as a pre-shared key based cipher
 		// supported by the server
 		supportedClientCiphers = new byte[]{(byte) 0xC0, (byte) 0xAE, // TLS_ECDHE_ECDSA_WITH_AES_128_CCM_8
-																				(byte) 0xC0, (byte) 0xA8};// TLS_PSK_WITH_AES_128_CCM_8
+											(byte) 0xC0, (byte) 0xA8};// TLS_PSK_WITH_AES_128_CCM_8
 		List<byte[]> extensions = new LinkedList<>();
 		SupportedGroup supportedGroup = getArbitrarySupportedGroup();
 		extensions.add(DtlsTestTools.newSupportedEllipticCurvesExtension(supportedGroup.getId()));
@@ -232,6 +252,7 @@ public class ServerHandshakerTest {
 
 		// THEN the server selects the PSK based cipher because it does not consider the public
 		// key based cipher a valid option due to the client's lacking support for RPKs
+		assertNotNull(messageProcessingResultHandler.getLastMessage(200));
 		assertThat(session.getCipherSuite(), is(CipherSuite.TLS_PSK_WITH_AES_128_CCM_8));
 		assertThat(handshaker.getNegotiatedServerCertificateType(), is(nullValue()));
 	}
@@ -243,30 +264,28 @@ public class ServerHandshakerTest {
 		// certificate type 0x05 is not defined by IANA
 		extensions.add(DtlsTestTools.newClientCertificateTypesExtension(0x05));
 
-		try {
-			processClientHello(0, extensions);
-			fail("Should have thrown " + HandshakeException.class.getSimpleName());
-		} catch (HandshakeException e) {
-			assertThat(session.getCipherSuite(), is(CipherSuite.TLS_NULL_WITH_NULL_NULL));
-			assertThat(handshaker.getNegotiatedClientCertificateType(), is(nullValue()));
-		}
+		processClientHello(0, extensions);
+		RecordProcessingException error = messageProcessingResultHandler.getLastError(200);
+		assertNotNull(error);
+		assertThat(error.getSeverity(), is(AlertLevel.FATAL));
+		assertThat(session.getCipherSuite(), is(CipherSuite.TLS_NULL_WITH_NULL_NULL));
+		assertThat(handshaker.getNegotiatedClientCertificateType(), is(nullValue()));
 	}
 
 	@Test
-	public void testReceiveClientHelloAbortsOnNonMatchingClientCertificateTypes() {
+	public void testReceiveClientHelloAbortsOnNonMatchingClientCertificateTypes() throws HandshakeException {
 		List<byte[]> extensions = new LinkedList<>();
 		// certificate type OpenPGP is not supported by Scandium
 		extensions.add(DtlsTestTools.newClientCertificateTypesExtension(
 				CertificateType.OPEN_PGP.getCode()));
 
-		try {
-			processClientHello(0, extensions);
-			fail("Should have thrown " + HandshakeException.class.getSimpleName());
-		} catch(HandshakeException e) {
-			// check if handshake has been aborted due to unsupported certificate
-			assertThat(session.getCipherSuite(), is(CipherSuite.TLS_NULL_WITH_NULL_NULL));
-			assertThat(handshaker.getNegotiatedClientCertificateType(), is(nullValue()));
-		}
+		processClientHello(0, extensions);
+		RecordProcessingException error = messageProcessingResultHandler.getLastError(200);
+		assertNotNull(error);
+		assertThat(error.getSeverity(), is(AlertLevel.FATAL));
+		// check if handshake has been aborted due to unsupported certificate
+		assertThat(session.getCipherSuite(), is(CipherSuite.TLS_NULL_WITH_NULL_NULL));
+		assertThat(handshaker.getNegotiatedClientCertificateType(), is(nullValue()));
 	}
 
 	@Test
@@ -280,6 +299,7 @@ public class ServerHandshakerTest {
 				CertificateType.OPEN_PGP.getCode(), CertificateType.X_509.getCode()));
 
 		processClientHello(0, extensions);
+		assertNotNull(messageProcessingResultHandler.getLastMessage(200));
 		assertThat(session.getCipherSuite(), is(SERVER_CIPHER_SUITE));
 		assertThat(handshaker.getNegotiatedClientCertificateType(), is(CertificateType.X_509));
 		assertThat(handshaker.getNegotiatedServerCertificateType(), is(CertificateType.X_509));
@@ -291,14 +311,13 @@ public class ServerHandshakerTest {
 		// certificate type 0x05 is not defined by IANA
 		extensions.add(DtlsTestTools.newServerCertificateTypesExtension(0x05));
 
-		try {
-			processClientHello(0, extensions);
-			fail("Should have thrown " + HandshakeException.class.getSimpleName());
-		} catch(HandshakeException e) {
-			// check if handshake has been aborted due to unsupported certificate
-			assertThat(session.getCipherSuite(), is(CipherSuite.TLS_NULL_WITH_NULL_NULL));
-			assertThat(handshaker.getNegotiatedServerCertificateType(), is(nullValue()));
-		}
+		processClientHello(0, extensions);
+		RecordProcessingException error = messageProcessingResultHandler.getLastError(200);
+		assertNotNull(error);
+		assertThat(error.getSeverity(), is(AlertLevel.FATAL));
+		// check if handshake has been aborted due to unsupported certificate
+		assertThat(session.getCipherSuite(), is(CipherSuite.TLS_NULL_WITH_NULL_NULL));
+		assertThat(handshaker.getNegotiatedServerCertificateType(), is(nullValue()));
 	}
 
 	@Test
@@ -307,13 +326,13 @@ public class ServerHandshakerTest {
 		List<byte[]> extensions = new LinkedList<>();
 		// curveId 0x0000 is not assigned by IANA
 		extensions.add(DtlsTestTools.newSupportedEllipticCurvesExtension(0x0000));
-		try {
-			processClientHello(0, extensions);
-			fail("Should have thrown " + HandshakeException.class.getSimpleName());
-		} catch(HandshakeException e) {
-			assertThat(session.getCipherSuite(), is(CipherSuite.TLS_NULL_WITH_NULL_NULL));
-			assertThat(handshaker.getNegotiatedSupportedGroup(), nullValue());
-		}
+
+		processClientHello(0, extensions);
+		RecordProcessingException error = messageProcessingResultHandler.getLastError(200);
+		assertNotNull(error);
+		assertThat(error.getSeverity(), is(AlertLevel.FATAL));
+		assertThat(session.getCipherSuite(), is(CipherSuite.TLS_NULL_WITH_NULL_NULL));
+		assertThat(handshaker.getNegotiatedSupportedGroup(), nullValue());
 	}
 
 	@Test()
@@ -324,6 +343,7 @@ public class ServerHandshakerTest {
 		// curveId 0x0000 is not assigned by IANA
 		extensions.add(DtlsTestTools.newSupportedEllipticCurvesExtension(0x0000, supportedGroup.getId()));
 		processClientHello(0, extensions);
+		assertNotNull(messageProcessingResultHandler.getLastMessage(200));
 		assertThat(session.getCipherSuite(), is(SERVER_CIPHER_SUITE));
 		assertThat(handshaker.getNegotiatedSupportedGroup(), is(supportedGroup));
 	}
@@ -339,25 +359,34 @@ public class ServerHandshakerTest {
 
 		// omit supported elliptic curves extension
 		processClientHello(0, null);
+		assertNotNull(messageProcessingResultHandler.getLastMessage(200));
 		assertThat(session.getCipherSuite(), is(SERVER_CIPHER_SUITE));
 		assertThat(handshaker.getNegotiatedSupportedGroup(), notNullValue());
 	}
 
 	@Test
 	public void testDoProcessMessageProcessesQueuedMessages() throws Exception {
+
 		Record nextRecord = givenAHandshakerWithAQueuedMessage();
+		messageProcessingResultHandler.setExpectedMessages(2);
 		handshaker.processMessage(nextRecord);
+		assertNotNull(messageProcessingResultHandler.getLastMessage(200));
 		assertThatAllMessagesHaveBeenProcessedInOrder();
 	}
 
 	private ServerHandshaker newHandshaker(final DtlsConnectorConfig config, final DTLSSession session) throws HandshakeException {
-		return new ServerHandshaker(session, recordLayer, null, config, ETHERNET_MTU);
+
+		ServerHandshaker result = new ServerHandshaker(session, recordLayer, null, config, ETHERNET_MTU, taskExecutor);
+		messageProcessingResultHandler = new LatchBasedMessageProcessingResultHandler();
+		result.setMessageProcessingResultHandler(messageProcessingResultHandler);
+		return result;
 	}
 
 	private Record givenAHandshakerWithAQueuedMessage() throws Exception {
 
 		InetSocketAddress senderAddress = new InetSocketAddress(5000);
 		processClientHello(0, null);
+		assertNotNull(messageProcessingResultHandler.getLastMessage(200));
 		assertThat(handshaker.getNextReceiveSeq(), is(1));
 		// create client CERTIFICATE msg
 		Certificate[] clientChain = DtlsTestTools.getClientCertificateChain();

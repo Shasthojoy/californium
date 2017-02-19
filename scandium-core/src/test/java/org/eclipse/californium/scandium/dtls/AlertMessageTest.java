@@ -63,10 +63,10 @@ public class AlertMessageTest {
 		// WHEN parsing the record
 		try {
 			AlertMessage.fromByteArray(fragment, peer);
-			fail("Should have thrown " + HandshakeException.class.getName());
+			fail("Should have thrown " + RecordParsingException.class.getName());
 
-			// THEN a fatal handshake exception will be thrown
-		} catch (HandshakeException e) {
+			// THEN a fatal exception will be thrown
+		} catch (RecordParsingException e) {
 			assertThat(e.getAlert().getLevel(), is(AlertLevel.FATAL));
 		}
 	}
@@ -83,10 +83,10 @@ public class AlertMessageTest {
 		// WHEN parsing the record
 		try {
 			AlertMessage.fromByteArray(fragment, peer);
-			fail("Should have thrown " + HandshakeException.class.getName());
+			fail("Should have thrown " + RecordParsingException.class.getName());
 
-			// THEN a fatal handshake exception will be thrown
-		} catch (HandshakeException e) {
+			// THEN a fatal exception will be thrown
+		} catch (RecordParsingException e) {
 			assertThat(e.getAlert().getLevel(), is(AlertLevel.FATAL));
 		}
 	}

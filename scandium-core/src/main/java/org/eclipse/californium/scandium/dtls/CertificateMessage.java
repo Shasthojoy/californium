@@ -362,12 +362,12 @@ public final class CertificateMessage extends HandshakeMessage {
 	 *                        of an X.509 certificate chain.
 	 * @param peerAddress The IP address and port of the peer that sent the message.
 	 * @return The certificate message.
-	 * @throws HandshakeException if the binary encoding could not be parsed.
+	 * @throws RecordParsingException if the binary encoding could not be parsed.
 	 */
 	public static CertificateMessage fromByteArray(
 			final byte[] byteArray,
 			boolean useRawPublicKey,
-			InetSocketAddress peerAddress) throws HandshakeException {
+			InetSocketAddress peerAddress) throws RecordParsingException {
 
 		DatagramReader reader = new DatagramReader(byteArray);
 
@@ -381,7 +381,7 @@ public final class CertificateMessage extends HandshakeMessage {
 		}
 	}
 
-	private static CertificateMessage readX509CertificateMessage(final DatagramReader reader, final InetSocketAddress peerAddress) throws HandshakeException {
+	private static CertificateMessage readX509CertificateMessage(final DatagramReader reader, final InetSocketAddress peerAddress) throws RecordParsingException {
 
 		LOGGER.log(Level.FINER, "Parsing X.509 CERTIFICATE message");
 		int certificateChainLength = reader.read(CERTIFICATE_LIST_LENGTH);
@@ -403,10 +403,9 @@ public final class CertificateMessage extends HandshakeMessage {
 			return new CertificateMessage(factory.generateCertPath(certs), peerAddress);
 
 		} catch (CertificateException e) {
-			throw new HandshakeException(
+			throw new RecordParsingException(ContentType.HANDSHAKE, peerAddress,
 					"Cannot parse X.509 certificate chain provided by peer",
-					new AlertMessage(AlertLevel.FATAL, AlertDescription.BAD_CERTIFICATE, peerAddress),
-					e);
+					AlertDescription.BAD_CERTIFICATE, e);
 		}
 	}
 

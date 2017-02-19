@@ -222,12 +222,12 @@ public final class ClientHello extends HandshakeMessage {
 	 *            the IP address and port of the peer this message has been
 	 *            received from or should be sent to
 	 * @return the ClientHello object
-	 * @throws HandshakeException
+	 * @throws RecordParsingException
 	 *             if any of the extensions included in the message is of an
 	 *             unsupported type
 	 */
 	public static HandshakeMessage fromByteArray(byte[] byteArray, InetSocketAddress peerAddress)
-			throws HandshakeException {
+			throws RecordParsingException {
 		DatagramReader reader = new DatagramReader(byteArray);
 		ClientHello result = new ClientHello(peerAddress);
 

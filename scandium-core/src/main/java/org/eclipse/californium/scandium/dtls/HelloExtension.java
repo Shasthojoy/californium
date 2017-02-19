@@ -127,11 +127,11 @@ public abstract class HelloExtension {
 	 * @param peerAddress the IP address and port of the peer that sent this extension
 	 * @return the object representing the extension or <code>null</code> if the extension
 	 * type is not (yet) known to or supported by Scandium.
-	 * @throws HandshakeException if the (supported) extension could not be de-serialized, e.g. due
+	 * @throws RecordParsingException if the (supported) extension could not be de-serialized, e.g. due
 	 * to erroneous encoding etc.
 	 */
 	public static HelloExtension fromByteArray(int typeCode, byte[] extensionData, InetSocketAddress peerAddress)
-			throws HandshakeException {
+			throws RecordParsingException {
 		ExtensionType type = ExtensionType.getExtensionTypeById(typeCode);
 		if (type == null) {
 			return null;
@@ -161,7 +161,7 @@ public abstract class HelloExtension {
 	@Override
 	public String toString() {
 		StringBuilder sb = new StringBuilder();
-		sb.append("\t\t\tExtension: ").append(type).append(" (").append(type.getId()).append(")\n");
+		sb.append("\t\t\tExtension: ").append(type).append(" (").append(type.getId()).append(")").append(System.lineSeparator());
 		return sb.toString();
 	}
 

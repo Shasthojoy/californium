@@ -39,4 +39,6 @@ public interface RecordLayer {
 	 *                  timespan to wait between re-transmissions. 
 	 */
 	void sendFlight(DTLSFlight flight);
+
+	void onRecordProcessingError(RecordProcessingException cause);
 }

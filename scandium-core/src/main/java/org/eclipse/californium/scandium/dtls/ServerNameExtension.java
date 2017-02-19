@@ -21,7 +21,6 @@ import java.nio.charset.StandardCharsets;
 import org.eclipse.californium.elements.util.DatagramReader;
 import org.eclipse.californium.elements.util.DatagramWriter;
 import org.eclipse.californium.scandium.dtls.AlertMessage.AlertDescription;
-import org.eclipse.californium.scandium.dtls.AlertMessage.AlertLevel;
 import org.eclipse.californium.scandium.util.ServerName;
 import org.eclipse.californium.scandium.util.ServerName.NameType;
 import org.eclipse.californium.scandium.util.ServerNames;
@@ -124,9 +123,9 @@ public final class ServerNameExtension extends HelloExtension {
 	 * @param extensionData The byte representation.
 	 * @param peerAddress The IP address and port that the extension has been received from.
 	 * @return The instance.
-	 * @throws HandshakeException if the byte representation could not be parsed.
+	 * @throws RecordParsingException if the byte representation could not be parsed.
 	 */
-	public static ServerNameExtension fromExtensionData(final byte[] extensionData, final InetSocketAddress peerAddress) throws HandshakeException {
+	public static ServerNameExtension fromExtensionData(final byte[] extensionData, final InetSocketAddress peerAddress) throws RecordParsingException {
 		if (extensionData == null || extensionData.length == 0) {
 			// this is an "empty" Server Name Indication received in a SERVER_HELLO
 			return ServerNameExtension.emptyServerNameIndication();
@@ -138,7 +137,7 @@ public final class ServerNameExtension extends HelloExtension {
 
 	private static ServerNameExtension readServerNameList(
 			final DatagramReader reader,
-			final InetSocketAddress peerAddress) throws HandshakeException {
+			final InetSocketAddress peerAddress) throws RecordParsingException {
 
 		ServerNames serverNames = ServerNames.newInstance();
 		int listLengthBytes = reader.read(LIST_LENGTH_BITS);
@@ -152,9 +151,10 @@ public final class ServerNameExtension extends HelloExtension {
 					listLengthBytes -= (hostname.length + 3);
 					break;
 				default:
-					throw new HandshakeException(
+					throw new RecordParsingException(
+							ContentType.HANDSHAKE, peerAddress,
 							"Server Name Indication extension contains unknown name_type",
-							new AlertMessage(AlertLevel.FATAL, AlertDescription.ILLEGAL_PARAMETER, peerAddress));
+							AlertDescription.ILLEGAL_PARAMETER);
 				}
 			} else {
 				throw newDecodeError(peerAddress);
@@ -163,7 +163,7 @@ public final class ServerNameExtension extends HelloExtension {
 		return new ServerNameExtension(serverNames);
 	}
 
-	private static byte[] readHostName(final DatagramReader reader, final InetSocketAddress peerAddress) throws HandshakeException {
+	private static byte[] readHostName(final DatagramReader reader, final InetSocketAddress peerAddress) throws RecordParsingException {
 
 		if (reader.bitsLeft() >= LENGTH_BITS) {
 			int length = reader.read(LENGTH_BITS);
@@ -174,11 +174,11 @@ public final class ServerNameExtension extends HelloExtension {
 		throw newDecodeError(peerAddress);
 	}
 
-	private static HandshakeException newDecodeError(final InetSocketAddress peerAddress) {
+	private static RecordParsingException newDecodeError(final InetSocketAddress peerAddress) {
 
-		return new HandshakeException(
-				"malformed Server Name Indication extension",
-				new AlertMessage(AlertLevel.FATAL, AlertDescription.DECODE_ERROR, peerAddress));
+		return new RecordParsingException(
+				ContentType.HANDSHAKE, peerAddress,
+				"malformed Server Name Indication extension");
 	}
 
 	/**

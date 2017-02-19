@@ -20,7 +20,6 @@ import java.net.InetSocketAddress;
 import org.eclipse.californium.elements.util.DatagramReader;
 import org.eclipse.californium.elements.util.DatagramWriter;
 import org.eclipse.californium.scandium.dtls.AlertMessage.AlertDescription;
-import org.eclipse.californium.scandium.dtls.AlertMessage.AlertLevel;
 
 /**
  * An object representation of the <em>MaxFragmentLength</em> extension
@@ -64,24 +63,21 @@ public class MaxFragmentLengthExtension extends HelloExtension {
 	 * @param extensionData the extension data struct containing the length code
 	 * @param peerAddress the IP address and port of the peer that sent the extension
 	 * @return the extension object
-	 * @throws HandshakeException if the extension data contains an unknown code
+	 * @throws RecordParsingException if the extension data contains an unknown code
 	 */
 	static final MaxFragmentLengthExtension fromExtensionData(byte[] extensionData,
-			InetSocketAddress peerAddress) throws HandshakeException {
+			InetSocketAddress peerAddress) throws RecordParsingException {
 		DatagramReader reader = new DatagramReader(extensionData);
 		int code = reader.read(CODE_BITS);
 		Length length = Length.fromCode(code);
 		if (length != null) {
 			return new MaxFragmentLengthExtension(length);
 		} else {
-			throw new HandshakeException(
+			throw new RecordParsingException(ContentType.HANDSHAKE, peerAddress,
 					String.format(
 							"Peer uses unknown code [%d] in %s extension",
 							code, ExtensionType.MAX_FRAGMENT_LENGTH.name()),
-					new AlertMessage(
-							AlertLevel.FATAL,
-							AlertDescription.ILLEGAL_PARAMETER,
-							peerAddress));
+					AlertDescription.ILLEGAL_PARAMETER);
 		}
 	}
 

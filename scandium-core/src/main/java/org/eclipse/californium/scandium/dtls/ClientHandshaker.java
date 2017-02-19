@@ -37,6 +37,7 @@ import java.security.cert.CertPath;
 import java.security.interfaces.ECPublicKey;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Executor;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -130,14 +131,16 @@ public class ClientHandshaker extends Handshaker {
 	 *            the DTLS configuration.
 	 * @param maxTransmissionUnit
 	 *            the MTU value reported by the network interface the record layer is bound to.
+	 * @param taskExecutor
+	 *            The executor to use for processing handshake messages.
 	 * @throws IllegalStateException
 	 *            if the message digest required for computing the FINISHED message hash cannot be instantiated.
 	 * @throws NullPointerException
-	 *            if session, recordLayer or config is <code>null</code>
+	 *            if session, record layer, config or task executor is <code>null</code>
 	 */
-	public ClientHandshaker(DTLSSession session, RecordLayer recordLayer, SessionListener sessionListener,
-			DtlsConnectorConfig config, int maxTransmissionUnit) {
-		super(true, session, recordLayer, sessionListener, config.getTrustStore(), maxTransmissionUnit);
+	ClientHandshaker(DTLSSession session, RecordLayer recordLayer, SessionListener sessionListener,
+			DtlsConnectorConfig config, int maxTransmissionUnit, Executor taskExecutor) {
+		super(true, session, recordLayer, sessionListener, config.getTrustStore(), maxTransmissionUnit, taskExecutor);
 		this.privateKey = config.getPrivateKey();
 		this.certificateChain = config.getCertificateChain();
 		this.publicKey = config.getPublicKey();
@@ -169,7 +172,7 @@ public class ClientHandshaker extends Handshaker {
 	
 
 	@Override
-	protected synchronized void doProcessMessage(DTLSMessage message) throws HandshakeException, GeneralSecurityException {
+	protected synchronized void doProcessMessage(DTLSMessage message) throws RecordProcessingException {
 
 		// log record now (even if message is still encrypted) in case an Exception
 		// is thrown during processing
@@ -275,10 +278,9 @@ public class ClientHandshaker extends Handshaker {
 	 * 
 	 * @param message
 	 *            the {@link Finished} message.
-	 * @throws HandshakeException
-	 * @throws GeneralSecurityException if the APPLICATION record cannot be created 
+	 * @throws RecordProcessingException if the APPLICATION record cannot be created 
 	 */
-	private void receivedServerFinished(Finished message) throws HandshakeException, GeneralSecurityException {
+	private void receivedServerFinished(Finished message) throws RecordProcessingException {
 
 		message.verifyData(getMasterSecret(), false, handshakeHash);
 		state = HandshakeType.FINISHED.getCode();
@@ -426,10 +428,10 @@ public class ClientHandshaker extends Handshaker {
 	 * necessary messages (depending on server's previous flight) and returns
 	 * the next flight.
 	 * 
-	 * @throws HandshakeException
+	 * @throws RecordProcessingException
 	 * @throws GeneralSecurityException if the client's handshake records cannot be created
 	 */
-	private void receivedServerHelloDone(ServerHelloDone message) throws HandshakeException, GeneralSecurityException {
+	private void receivedServerHelloDone(ServerHelloDone message) throws RecordProcessingException {
 		DTLSFlight flight = new DTLSFlight(getSession());
 		if (serverHelloDone != null && (serverHelloDone.getMessageSeq() == message.getMessageSeq())) {
 			// discard duplicate message

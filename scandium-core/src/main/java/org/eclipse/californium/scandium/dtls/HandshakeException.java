@@ -16,26 +16,31 @@
  ******************************************************************************/
 package org.eclipse.californium.scandium.dtls;
 
+import java.net.InetSocketAddress;
+
+import org.eclipse.californium.scandium.dtls.AlertMessage.AlertDescription;
+import org.eclipse.californium.scandium.dtls.AlertMessage.AlertLevel;
+
 /**
  * The base exception class for all exceptions during a DTLS handshake.
  */
-public class HandshakeException extends Exception {
+public class HandshakeException extends RecordProcessingException {
 
 	private static final long serialVersionUID = 1123415935894222594L;
 
-	private final AlertMessage alert;
-
 	public HandshakeException(String message, AlertMessage alert) {
-		super(message);
-		this.alert = alert;
+		this(message, alert, null);
 	}
 
 	public HandshakeException(String message, AlertMessage alert, Throwable cause) {
-		super(message, cause);
-		this.alert = alert;
+		this(alert.getPeer(), message, alert.getLevel(), alert.getDescription(), cause);
 	}
 
-	public AlertMessage getAlert() {
-		return alert;
+	public HandshakeException(InetSocketAddress peerAddress, String message, AlertLevel severity, AlertDescription description) {
+		this(peerAddress, message, severity, description, null);
+	}
+
+	public HandshakeException(InetSocketAddress peerAddress, String message, AlertLevel severity, AlertDescription description, Throwable cause) {
+		super(ContentType.HANDSHAKE, peerAddress, message, severity, description, cause);
 	}
 }
