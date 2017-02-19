@@ -239,7 +239,7 @@ public class ResumingClientHandshaker extends ClientHandshaker {
 		setCurrentWriteState();
 
 		handshakeHash = mdWithServerFinish.digest();
-		Finished finished = new Finished(session.getMasterSecret(), isClient, handshakeHash, message.getPeer());
+		Finished finished = new Finished(session.getMasterSecret(), isClient(), handshakeHash, message.getPeer());
 		flight.addMessage(wrapMessage(finished));
 		state = HandshakeType.FINISHED.getCode();
 

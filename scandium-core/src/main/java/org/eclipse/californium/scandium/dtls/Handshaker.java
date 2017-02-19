@@ -73,11 +73,12 @@ public abstract class Handshaker {
 	private static final String MESSAGE_DIGEST_ALGORITHM_NAME = "SHA-256";
 	private static final Logger LOGGER = Logger.getLogger(Handshaker.class.getName());
 
-	/**
-	 * Indicates whether this handshaker performs the client or server part of
-	 * the protocol.
-	 */
-	protected final boolean isClient;
+	protected final DTLSSession session;
+	protected final RecordLayer recordLayer;
+	/** list of trusted self-signed root certificates */
+	protected final Certificate[] rootCertificates;
+	/** Store the fragmented messages until we are able to reassemble the handshake message. */
+	protected final Map<Integer, SortedSet<FragmentedHandshakeMessage>> fragmentedMessages = new HashMap<Integer, SortedSet<FragmentedHandshakeMessage>>();
 
 	protected int state = -1;
 
@@ -88,36 +89,8 @@ public abstract class Handshaker {
 	/** The helper class to execute the ECDHE key agreement and key generation. */
 	protected ECDHECryptography ecdhe;
 
-	private byte[] masterSecret;
-
-	private SecretKey clientWriteMACKey;
-	private SecretKey serverWriteMACKey;
-
-	private IvParameterSpec clientWriteIV;
-	private IvParameterSpec serverWriteIV;
-
-	private SecretKey clientWriteKey;
-	private SecretKey serverWriteKey;
-
-	protected final DTLSSession session;
-	protected final RecordLayer recordLayer;
-	/** list of trusted self-signed root certificates */
-	protected final Certificate[] rootCertificates;
-
-	/**
-	 * The current sequence number (in the handshake message called message_seq)
-	 * for this handshake.
-	 */
-	private int sequenceNumber = 0;
-
-	/** The next expected handshake message sequence number. */
-	private int nextReceiveSeq = 0;
-
 	/** Buffer for received records that can not be processed immediately. */
 	protected InboundMessageBuffer inboundMessageBuffer;
-	
-	/** Store the fragmented messages until we are able to reassemble the handshake message. */
-	protected Map<Integer, SortedSet<FragmentedHandshakeMessage>> fragmentedMessages = new HashMap<Integer, SortedSet<FragmentedHandshakeMessage>>();
 
 	/**
 	 * The message digest to compute the handshake hashes sent in the
@@ -137,7 +110,28 @@ public abstract class Handshaker {
 	/** The chain of certificates asserting this handshaker's identity */
 	protected Certificate[] certificateChain;
 
-	private Set<SessionListener> sessionListeners = new HashSet<>();
+	private final boolean client;
+	private final Set<SessionListener> sessionListeners = new HashSet<>();
+
+	private byte[] masterSecret;
+
+	private SecretKey clientWriteMACKey;
+	private SecretKey serverWriteMACKey;
+
+	private IvParameterSpec clientWriteIV;
+	private IvParameterSpec serverWriteIV;
+
+	private SecretKey clientWriteKey;
+	private SecretKey serverWriteKey;
+
+	/**
+	 * The current sequence number (in the handshake message called message_seq)
+	 * for this handshake.
+	 */
+	private int sequenceNumber = 0;
+
+	/** The next expected handshake message sequence number. */
+	private int nextReceiveSeq = 0;
 
 	private boolean changeCipherSuiteMessageExpected = false;
 
@@ -204,7 +198,7 @@ public abstract class Handshaker {
 		} else if (initialMessageSeq < 0) {
 			throw new IllegalArgumentException("Initial message sequence number must not be negative");
 		}
-		this.isClient = isClient;
+		this.client = isClient;
 		this.sequenceNumber = initialMessageSeq;
 		this.nextReceiveSeq = initialMessageSeq;
 		this.session = session;
@@ -453,7 +447,15 @@ public abstract class Handshaker {
 	 */
 	public abstract void startHandshake() throws HandshakeException;
 
-	// Methods ////////////////////////////////////////////////////////
+	/**
+	 * Checks whether this handshaker represents the client side of the handshake
+	 * protocol.
+	 * 
+	 * @return {@code true} if this is the client side.
+	 */
+	final boolean isClient() {
+		return client;
+	}
 
 	/**
 	 * First, generates the master secret from the given premaster secret and
@@ -561,7 +563,7 @@ public abstract class Handshaker {
 
 	protected final void setCurrentReadState() {
 		DTLSConnectionState connectionState;
-		if (isClient) {
+		if (client) {
 			connectionState = new DTLSConnectionState(session.getCipherSuite(), session.getCompressionMethod(), serverWriteKey, serverWriteIV, serverWriteMACKey);
 		} else {
 			connectionState = new DTLSConnectionState(session.getCipherSuite(), session.getCompressionMethod(), clientWriteKey, clientWriteIV, clientWriteMACKey);
@@ -571,7 +573,7 @@ public abstract class Handshaker {
 
 	protected final void setCurrentWriteState() {
 		DTLSConnectionState connectionState;
-		if (isClient) {
+		if (client) {
 			connectionState = new DTLSConnectionState(session.getCipherSuite(), session.getCompressionMethod(), clientWriteKey, clientWriteIV, clientWriteMACKey);
 		} else {
 			connectionState = new DTLSConnectionState(session.getCipherSuite(), session.getCompressionMethod(), serverWriteKey, serverWriteIV, serverWriteMACKey);
@@ -694,17 +696,17 @@ public abstract class Handshaker {
 		}
 		// store fragment together with other fragments of same message_seq
 		existingFragments.add(fragment);
-		
+
 		reassembledMessage = reassembleFragments(messageSeq, existingFragments,
 				fragment.getMessageLength(), fragment.getMessageType(), session);
 		if (reassembledMessage != null) {
 			LOGGER.log(Level.FINER, "Successfully re-assembled {0} message", reassembledMessage.getMessageType());
 			fragmentedMessages.remove(messageSeq);
 		}
-		
+
 		return reassembledMessage;
 	}
-	
+
 	/**
 	 * Reassembles handshake message fragments into the original message.
 	 * 
@@ -817,7 +819,7 @@ public abstract class Handshaker {
 	public final DTLSSession getSession() {
 		return session;
 	}
-	
+
 	/**
 	 * Gets the IP address and port of the peer this handshaker is used to
 	 * negotiate a session with.
@@ -827,8 +829,7 @@ public abstract class Handshaker {
 	public final InetSocketAddress getPeerAddress() {
 		return session.getPeer();
 	}
-	
-	
+
 	/**
 	 * Sets the message sequence number on an outbound handshake message.
 	 * 
@@ -854,18 +855,18 @@ public abstract class Handshaker {
 		if (listener != null)
 			sessionListeners.add(listener);
 	}
-	
+
 	public void removeSessionListener(SessionListener listener){
 		if (listener != null)
 			sessionListeners.remove(listener);
 	}
-	
+
 	protected final void handshakeStarted() throws HandshakeException {
 		for (SessionListener sessionListener : sessionListeners) {
 			sessionListener.handshakeStarted(this);
 		}
 	}
-	
+
 	protected final void sessionEstablished() throws HandshakeException {
 		for (SessionListener sessionListener : sessionListeners) {
 			sessionListener.sessionEstablished(this, this.getSession());

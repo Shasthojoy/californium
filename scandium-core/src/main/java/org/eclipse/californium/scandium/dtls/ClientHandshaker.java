@@ -571,7 +571,7 @@ public class ClientHandshaker extends Handshaker {
 		}
 
 		handshakeHash = md.digest();
-		Finished finished = new Finished(getMasterSecret(), isClient, handshakeHash, session.getPeer());
+		Finished finished = new Finished(getMasterSecret(), isClient(), handshakeHash, session.getPeer());
 		flight.addMessage(wrapMessage(finished));
 		
 		// compute handshake hash with client's finished message also
