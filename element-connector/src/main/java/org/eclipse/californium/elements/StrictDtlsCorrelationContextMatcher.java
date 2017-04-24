@@ -13,6 +13,10 @@
  * Contributors:
  *    Bosch Software Innovations GmbH - add flexible correlation context matching
  *                                      (fix GitHub issue #104)
+ *    Achim Kraus (Bosch Software Innovations GmbH) - move KEY_SESSION_ID from 
+ *                                                    DtlsCorrelationContext into
+ *                                                    CorrelationContext. Support 
+ *                                                    TlsConnectors also as secure.
  ******************************************************************************/
 package org.eclipse.californium.elements;
 
@@ -22,7 +26,7 @@ package org.eclipse.californium.elements;
  */
 public class StrictDtlsCorrelationContextMatcher extends KeySetCorrelationContextMatcher {
 
-	private static final String KEYS[] = { DtlsCorrelationContext.KEY_SESSION_ID, DtlsCorrelationContext.KEY_EPOCH,
+	private static final String KEYS[] = { CorrelationContext.KEY_SESSION_ID, DtlsCorrelationContext.KEY_EPOCH,
 			DtlsCorrelationContext.KEY_CIPHER };
 
 	public StrictDtlsCorrelationContextMatcher() {

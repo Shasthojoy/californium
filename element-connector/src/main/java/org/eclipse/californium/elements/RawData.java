@@ -20,6 +20,10 @@
  *    Achim Kraus (Bosch Software Innovations GmbH) - add onContextEstablished.
  *    Achim Kraus (Bosch Software Innovations GmbH) - add CorrelationContext to outbound
  *                                                    (fix GitHub issue #104)
+ *    Achim Kraus (Bosch Software Innovations GmbH) - move KEY_SESSION_ID from 
+ *                                                    DtlsCorrelationContext into
+ *                                                    CorrelationContext. Support 
+ *                                                    TlsConnectors also as secure.
  ******************************************************************************/
 package org.eclipse.californium.elements;
 
@@ -332,7 +336,7 @@ public final class RawData {
 	 */
 	public boolean isSecure() {
 		return (correlationContext != null &&
-				correlationContext.get(DtlsCorrelationContext.KEY_SESSION_ID) != null);
+				correlationContext.get(CorrelationContext.KEY_SESSION_ID) != null);
 	}
 
 	/**

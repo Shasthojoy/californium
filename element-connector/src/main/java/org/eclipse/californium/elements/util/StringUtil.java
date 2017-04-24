@@ -12,6 +12,8 @@
  * 
  * Contributors:
  *    Bosch Software Innovations GmbH - initial implementation
+ *    Achim Kraus (Bosch Software Innovations GmbH) - add byteArray2HexString
+ *                                                    and trunc
  ******************************************************************************/
 package org.eclipse.californium.elements.util;
 
@@ -55,6 +57,48 @@ public class StringUtil {
 			++indexSrc;
 		}
 		return result;
+	}
+
+	/**
+	 * Byte array to hexadecimal string.
+	 * 
+	 * @param byteArray byte array to be converted to string
+	 * @param max maximum bytes to be converted.
+	 * @return hexadecimal string
+	 */
+	public static String byteArray2HexString(byte[] byteArray, int max) {
+
+		if (byteArray != null && byteArray.length != 0) {
+			if (0 == max || max > byteArray.length) {
+				max = byteArray.length;
+			}
+			StringBuilder builder = new StringBuilder(max * 3);
+			for (int i = 0; i < max; i++) {
+				builder.append(String.format("%02X", 0xFF & byteArray[i]));
+
+				if (i < max - 1) {
+					builder.append(' ');
+				}
+			}
+			return builder.toString();
+		} else {
+			return "--";
+		}
+	}
+
+	/**
+	 * Truncate provided string.
+	 * 
+	 * @param text string to be truncated, if length is over the provided
+	 *            maxLength
+	 * @param maxLength maximum length of string. (0 doesn't truncate)
+	 * @return truncated or original string
+	 */
+	public static String trunc(String text, int maxLength) {
+		if (null != text && 0 < maxLength && maxLength < text.length()) {
+			return text.substring(0, maxLength - 1);
+		}
+		return text;
 	}
 
 }

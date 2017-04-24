@@ -13,14 +13,10 @@
  * Contributors:
  * Joe Magerramov (Amazon Web Services) - CoAP over TCP support.
  * Achim Kraus (Bosch Software Innovations GmbH) - create "remote aware" SSLEngine
+ * Achim Kraus (Bosch Software Innovations GmbH) - delay sending message after complete
+ *                                                 TLS handshake.
  ******************************************************************************/
 package org.eclipse.californium.elements.tcp;
-
-import io.netty.channel.Channel;
-import io.netty.handler.ssl.SslHandler;
-
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.SSLEngine;
 
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
@@ -29,8 +25,20 @@ import java.security.NoSuchAlgorithmException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLEngine;
+
+import org.eclipse.californium.elements.CorrelationContext;
+import org.eclipse.californium.elements.CorrelationContextMatcher;
+import org.eclipse.californium.elements.RawData;
+
+import io.netty.channel.Channel;
+import io.netty.handler.ssl.SslHandler;
+import io.netty.util.concurrent.Future;
+import io.netty.util.concurrent.GenericFutureListener;
+
 /**
- * A TCP client connector that establishes outbound TLS connections.
+ * A TLS client connector that establishes outbound TLS connections.
  */
 public class TlsClientConnector extends TcpClientConnector {
 
@@ -58,6 +66,35 @@ public class TlsClientConnector extends TcpClientConnector {
 			this.sslContext.init(null, null, null);
 		} catch (NoSuchAlgorithmException | KeyManagementException e) {
 			throw new RuntimeException("Unable to initialize SSL context", e);
+		}
+	}
+
+	/**
+	 * {@inheritDoc}
+	 * 
+	 * Delay message sending after TLS handshake is completed.
+	 */
+	@Override
+	protected void send(final Channel channel, final CorrelationContextMatcher correlationMatcher, final RawData msg)
+			{
+		SslHandler sslHandler = channel.pipeline().get(SslHandler.class);
+		if (null == sslHandler) {
+			throw new RuntimeException("Missing SslHandler");
+		} else {
+			Future<Channel> handshakeFuture = sslHandler.handshakeFuture();
+			handshakeFuture.addListener(new GenericFutureListener<Future<Channel>>() {
+
+				@Override
+				public void operationComplete(Future<Channel> future) throws Exception {
+					if (future.isSuccess()) {
+						CorrelationContext context = NettyContextUtils.buildCorrelationContext(channel);
+						if (null == context || null == context.get(CorrelationContext.KEY_SESSION_ID)) {
+							throw new RuntimeException("Missing TlsCorrelationContext " + context);
+						}
+						TlsClientConnector.super.send(future.getNow(), correlationMatcher, msg);
+					}
+				}
+			});
 		}
 	}
 

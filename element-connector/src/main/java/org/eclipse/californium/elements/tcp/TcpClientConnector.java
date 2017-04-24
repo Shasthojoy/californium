@@ -21,6 +21,10 @@
  *                                                 (implemented afterwards)
  * Achim Kraus (Bosch Software Innovations GmbH) - add TcpCorrelationContextMatcher
  *                                                 implementation
+ * Achim Kraus (Bosch Software Innovations GmbH) - add send called after acquire future
+ *                                                 to delay sending the message after
+ *                                                 TLS handshake completes overwriting
+ *                                                 this method in a sub-class.
  ******************************************************************************/
 package org.eclipse.californium.elements.tcp;
 
@@ -139,19 +143,8 @@ public class TcpClientConnector implements Connector {
 			public void operationComplete(Future<Channel> future) throws Exception {
 				if (future.isSuccess()) {
 					Channel channel = future.getNow();
-					CorrelationContext context = NettyContextUtils.buildCorrelationContext(channel);
 					try {
-						/* check, if the message should be sent with the established connection */
-						if (null != correlationMatcher
-								&& !correlationMatcher.isToBeSent(msg.getCorrelationContext(), context)) {
-							if (LOGGER.isLoggable(Level.WARNING)) {
-								LOGGER.log(Level.WARNING, "TcpConnector (drops {0} bytes to {1}:{2}",
-										new Object[] { msg.getSize(), msg.getAddress(), msg.getPort() });
-							}
-							return;
-						}
-						channel.writeAndFlush(Unpooled.wrappedBuffer(msg.getBytes()));
-						msg.onContextEstablished(context);
+						send(channel, correlationMatcher, msg);
 					} finally {
 						channelPool.release(channel);
 					}
@@ -160,6 +153,32 @@ public class TcpClientConnector implements Connector {
 				}
 			}
 		});
+	}
+
+	/**
+	 * Send message with acquired channel.
+	 * 
+	 * Intended to be overridden, if message sending should be delayed to
+	 * complete a TLS handshake.
+	 * 
+	 * @param channel acquired channel
+	 * @param correlationMatcher correlation matcher
+	 * @param msg message to be send
+	 */
+	protected void send(final Channel channel, final CorrelationContextMatcher correlationMatcher, final RawData msg) {
+		CorrelationContext context = NettyContextUtils.buildCorrelationContext(channel);
+		/*
+		 * check, if the message should be sent with the established connection
+		 */
+		if (null != correlationMatcher && !correlationMatcher.isToBeSent(msg.getCorrelationContext(), context)) {
+			if (LOGGER.isLoggable(Level.WARNING)) {
+				LOGGER.log(Level.WARNING, "TcpConnector (drops {0} bytes to {1}:{2}",
+						new Object[] { msg.getSize(), msg.getAddress(), msg.getPort() });
+			}
+			return;
+		}
+		channel.writeAndFlush(Unpooled.wrappedBuffer(msg.getBytes()));
+		msg.onContextEstablished(context);
 	}
 
 	@Override public void setRawDataReceiver(RawDataChannel messageHandler) {

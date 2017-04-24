@@ -16,6 +16,7 @@
  *    Achim Kraus (Bosch Software Innovations GmbH) - create CorrelationContextMatcher
  *                                      related to connector
  *    Achim Kraus (Bosch Software Innovations GmbH) - add TCP support
+ *    Achim Kraus (Bosch Software Innovations GmbH) - add TLS support
  ******************************************************************************/
 package org.eclipse.californium.core.network;
 
@@ -26,6 +27,7 @@ import org.eclipse.californium.elements.CorrelationContextMatcher;
 import org.eclipse.californium.elements.RelaxedDtlsCorrelationContextMatcher;
 import org.eclipse.californium.elements.StrictDtlsCorrelationContextMatcher;
 import org.eclipse.californium.elements.TcpCorrelationContextMatcher;
+import org.eclipse.californium.elements.TlsCorrelationContextMatcher;
 import org.eclipse.californium.elements.UdpCorrelationContextMatcher;
 
 /**
@@ -39,9 +41,7 @@ public class CorrelationContextMatcherFactory {
 	 * USE_STRICT_RESPONSE_MATCHING is set, use
 	 * {@link StrictDtlsCorrelationContextMatcher}, otherwise
 	 * {@link RelaxedDtlsCorrelationContextMatcher}. For other protocol flavors
-	 * the corresponding matcher is used. Note: currently the TLS based
-	 * correlation context matcher is still missing and therefore for backwards
-	 * compatibility the DTLS ones are used.
+	 * the corresponding matcher is used.
 	 * 
 	 * @param connector connector to create related correlation context matcher.
 	 * @param config configuration.
@@ -52,15 +52,12 @@ public class CorrelationContextMatcherFactory {
 			if (connector.isSchemeSupported(CoAP.COAP_URI_SCHEME)) {
 				return new UdpCorrelationContextMatcher();
 			} else if (connector.isSchemeSupported(CoAP.COAP_SECURE_TCP_URI_SCHEME)) {
-				/*
-				 * To be implemented in a future PR, in the meanwhile use
-				 * default dtls matcher as default for backwards compatibility
-				 */
+				return new TlsCorrelationContextMatcher();
 			} else if (connector.isSchemeSupported(CoAP.COAP_TCP_URI_SCHEME)) {
 				return new TcpCorrelationContextMatcher();
 			}
 		}
-		return config.getBoolean(NetworkConfig.Keys.USE_STRICT_RESPONSE_MATCHING) ? new StrictDtlsCorrelationContextMatcher()
-				: new RelaxedDtlsCorrelationContextMatcher();
+		return config.getBoolean(NetworkConfig.Keys.USE_STRICT_RESPONSE_MATCHING)
+				? new StrictDtlsCorrelationContextMatcher() : new RelaxedDtlsCorrelationContextMatcher();
 	}
 }

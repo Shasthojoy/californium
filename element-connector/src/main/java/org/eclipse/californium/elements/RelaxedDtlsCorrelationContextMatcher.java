@@ -16,6 +16,10 @@
  *    Achim Kraus (Bosch Software Innovations GmbH) - add isToBeSent to control
  *                                                    outgoing messages
  *                                                    (fix GitHub issue #104)
+ *    Achim Kraus (Bosch Software Innovations GmbH) - move KEY_SESSION_ID from 
+ *                                                    DtlsCorrelationContext into
+ *                                                    CorrelationContext. Support 
+ *                                                    TlsConnectors also as secure.
  ******************************************************************************/
 package org.eclipse.californium.elements;
 
@@ -24,7 +28,7 @@ package org.eclipse.californium.elements;
  */
 public class RelaxedDtlsCorrelationContextMatcher extends KeySetCorrelationContextMatcher {
 
-	private static final String KEYS[] = { DtlsCorrelationContext.KEY_SESSION_ID, DtlsCorrelationContext.KEY_CIPHER };
+	private static final String KEYS[] = { CorrelationContext.KEY_SESSION_ID, DtlsCorrelationContext.KEY_CIPHER };
 
 	public RelaxedDtlsCorrelationContextMatcher() {
 		super("relaxed correlation", KEYS);
