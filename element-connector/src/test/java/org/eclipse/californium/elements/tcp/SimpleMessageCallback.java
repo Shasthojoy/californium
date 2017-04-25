@@ -12,8 +12,13 @@
  * 
  * Contributors:
  *    Achim Kraus (Bosch Software Innovations GmbH) - initial implementation
+ *    Achim Kraus (Bosch Software Innovations GmbH) - add type check to getter
  ******************************************************************************/
 package org.eclipse.californium.elements.tcp;
+
+import static org.hamcrest.CoreMatchers.instanceOf;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.core.Is.is;
 
 import org.eclipse.californium.elements.CorrelationContext;
 import org.eclipse.californium.elements.MessageCallback;
@@ -36,27 +41,42 @@ public class SimpleMessageCallback implements MessageCallback {
 	}
 
 	/**
-	 * Get correlation context of sent message.
+	 * Get typed correlation context of sent message.
 	 * 
+	 * Assert, that correlation context is of provided type.
+	 * 
+	 * @param clz class to check the correlation context.
 	 * @return correlation context of sent message, or null, if not jet sent or
 	 *         no correlation context is available.
 	 * @see #getCorrelationContext(long)
 	 */
-	public synchronized CorrelationContext getCorrelationContext() {
-		return context;
+	@SuppressWarnings("unchecked")
+	public <T extends CorrelationContext> T getCorrelationContext(Class<T> clz) {
+		CorrelationContext context;
+		synchronized (this) {
+			context = this.context;
+		}
+		assertThat(context, is(instanceOf(clz)));
+		return (T) context;
 	}
 
 	/**
 	 * Get correlation context of sent message waiting with timeout.
 	 * 
+	 * Assert, that correlation context is of provided type.
+	 * 
+	 * @param clz class to check the correlation context.
 	 * @return correlation context of sent message, or null, if not sent within
 	 *         provided timeout or no correlation context is available.
 	 * @see #getCorrelationContext(long)
 	 */
-	public synchronized CorrelationContext getCorrelationContext(long timeout) throws InterruptedException {
+	@SuppressWarnings("unchecked")
+	public synchronized <T extends CorrelationContext> T getCorrelationContext(Class<T> clz, long timeout)
+			throws InterruptedException {
 		if (null == context) {
 			wait(timeout);
 		}
-		return context;
+		assertThat(context, is(instanceOf(clz)));
+		return (T) context;
 	}
 }

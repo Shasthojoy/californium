@@ -14,11 +14,17 @@
  * Joe Magerramov (Amazon Web Services) - CoAP over TCP support.
  * Achim Kraus (Bosch Software Innovations GmbH) - add "blockUntilSize" with
  *                                                 timeout and "hasMessage". 
+ * Achim Kraus (Bosch Software Innovations GmbH) - add typed getCorrelationContext
  ******************************************************************************/
 package org.eclipse.californium.elements.tcp;
 
+import org.eclipse.californium.elements.CorrelationContext;
 import org.eclipse.californium.elements.RawData;
 import org.eclipse.californium.elements.RawDataChannel;
+
+import static org.hamcrest.CoreMatchers.*;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.core.Is.is;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -61,6 +67,26 @@ class Catcher implements RawDataChannel {
 		synchronized (lock) {
 			return messages.get(index);
 		}
+	}
+
+	/**
+	 * Get typed correlation context of message with provided index.
+	 * 
+	 * Assert that the correlation context is given and of provided type.
+	 * 
+	 * @param index index o f message
+	 * @param clz class of correlation context.
+	 * @return typed correlation context
+	 * @throws IndexOutOfBoundsException, if index is greater than the number of
+	 *             received messages
+	 */
+	@SuppressWarnings("unchecked")
+	<T extends CorrelationContext> T getCorrelationContext(int index, Class<T> clz) {
+		RawData msg = getMessage(index);
+		CorrelationContext context = msg.getCorrelationContext();
+		assertThat(context, is(notNullValue()));
+		assertThat(context, is(instanceOf(clz)));
+		return (T) context;
 	}
 
 	boolean hasMessage(int index) {
