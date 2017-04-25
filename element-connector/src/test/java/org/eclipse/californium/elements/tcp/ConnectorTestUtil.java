@@ -21,6 +21,7 @@
  *    Achim Kraus (Bosch Software Innovations GmbH) - add create server address
  *                                                    using LoopbackAddress.
  *    Achim Kraus (Bosch Software Innovations GmbH) - add TLS/x509 support
+ *    Achim Kraus (Bosch Software Innovations GmbH) - add self-signed credentials
  ******************************************************************************/
 package org.eclipse.californium.elements.tcp;
 
@@ -62,6 +63,13 @@ public class ConnectorTestUtil {
 	public static final char[] TRUST_STORE_PASSWORD = "rootPass".toCharArray();
 	public static final String TRUST_STORE_LOCATION = "certs/trustStore.jks";
 	public static final String NO_TRUST_STORE_LOCATION = "certs/noTrustStore.jks";
+	public static final char[] SELF_SIGNED_KEY_STORE_PASSWORD = "selfPass".toCharArray();
+	public static final String SELF_SIGNED_KEY_STORE_LOCATION = "certs/selfSignedKeyStore.jks";
+
+	public static final String SELF_SIGNED_SERVER_NAME = "cf-self-signed-server";
+	public static final String SELF_SIGNED_CLIENT_NAME = "cf-self-signed-client-1";
+	public static final String SELF_SIGNED_NO_TRUST_NAME = "cf-self-signed-client-2";
+	public static final String SELF_SIGNED_CLIENT_NAME_PATTERN = "cf-self-signed-client-.*";
 
 	public static final String SERVER_NAME = "server";
 	public static final String CLIENT_NAME = "client";
@@ -169,6 +177,44 @@ public class ConnectorTestUtil {
 
 		keys = SslContextLoggingUtil.logging(keys, aliasChain);
 		trusts = SslContextLoggingUtil.logging(trusts, aliasChain + "-no-trust");
+
+		SSLContext context = SSLContext.getInstance("TLS");
+		context.init(keys, trusts, null);
+		return new SSLTestContext(context, subjectDN);
+	}
+
+	/**
+	 * Initialize a SSL context using the "self signed key store."
+	 * 
+	 * @param aliasPrivateKey alias for private key. If <code>null</code>,
+	 *            replaced by aliasChain.
+	 * @param aliasChain alias for certificate chain.
+	 * @param aliasTrustsPattern alias pattern for trusts.
+	 * @return ssl context.
+	 * @throws Exception if an error occurred
+	 */
+	public static SSLTestContext initializeSelfSignedContext(String aliasPrivateKey, String aliasChain,
+			String aliasTrustsPattern) throws Exception {
+		if (null == aliasPrivateKey) {
+			aliasPrivateKey = aliasChain;
+		}
+		Credentials credentials = SslContextUtil.loadCredentials(SslContextUtil.CLASSPATH_PROTOCOL
+				+ SELF_SIGNED_KEY_STORE_LOCATION, aliasPrivateKey, SELF_SIGNED_KEY_STORE_PASSWORD,
+				SELF_SIGNED_KEY_STORE_PASSWORD);
+		X509Certificate[] chain = SslContextUtil.loadCertificateChain(SslContextUtil.CLASSPATH_PROTOCOL
+				+ SELF_SIGNED_KEY_STORE_LOCATION, aliasChain, SELF_SIGNED_KEY_STORE_PASSWORD);
+
+		KeyManager[] keys = SslContextUtil.createKeyManager(aliasChain, credentials.getPrivateKey(), chain);
+
+		TrustManager[] trusts = SslContextUtil.loadTrustManager(SslContextUtil.CLASSPATH_PROTOCOL
+				+ SELF_SIGNED_KEY_STORE_LOCATION, aliasTrustsPattern, SELF_SIGNED_KEY_STORE_PASSWORD);
+
+		Principal subjectDN = getSubjectDN(keys, aliasChain);
+		ConnectorTestUtil.log("keys ", keys);
+		ConnectorTestUtil.log("trusts", trusts, true);
+
+		keys = SslContextLoggingUtil.logging(keys, aliasChain);
+		trusts = SslContextLoggingUtil.logging(trusts, aliasChain);
 
 		SSLContext context = SSLContext.getInstance("TLS");
 		context.init(keys, trusts, null);
